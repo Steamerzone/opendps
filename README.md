@@ -5,6 +5,8 @@ Steamerzone:
  - made dpsmode the default screen (color)
  - added tft_clear() to dpsmode mode screen
  - some fixes for saving settings in dpsmode, still some bugs left (bug in past?)
+   - M1 Defaults to 5v  1a
+   - M2 Defaults to 12v 2a for now
  - changed font and font sizes
  - changed watt display to 3 digits
  - some great info: https://leo.leung.xyz/wiki/DPS5005
