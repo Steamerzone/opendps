@@ -1,6 +1,6 @@
 # OpenDPS
 
-Steamerzone:
+MessyCoding (c)Steamerzone:
  - made dpsmode the default screen (color)
  - added tft_clear() to dpsmode mode screen
  - some fixes for saving settings in dpsmode, still some bugs left (bug in past?)
