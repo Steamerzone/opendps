@@ -3,7 +3,7 @@
 Steamerzone:
  - made dpsmode the default screen (color)
  - added tft_clear() to dpsmode mode screen
- - some fixes for saving settings in dpsmode, still some bugs left
+ - some fixes for saving settings in dpsmode, still some bugs left (bug in past?)
  - changed font and font sizes
  - changed watt display to 3 digits
 
