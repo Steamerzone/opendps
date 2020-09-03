@@ -6,6 +6,7 @@ Steamerzone:
  - some fixes for saving settings in dpsmode, still some bugs left (bug in past?)
  - changed font and font sizes
  - changed watt display to 3 digits
+ - some great info: https://leo.leung.xyz/wiki/DPS5005
 
 #### Give your DPS5005 the upgrade it deserves
 
