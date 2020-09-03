@@ -5,7 +5,7 @@ COMMANDLINE := 0
 BAUDRATE ?= 9600
 
 # Set build model, defaults to DPS5005
-MODEL := DPS5005
+MODEL := DPS3005
 
 BINARY = opendps_$(MODEL)
 
@@ -17,7 +17,7 @@ THERMAL_LOCKOUT := 0
 
 # Build wifi version (only change being that the wifi icon will start flashing
 # on power up)
-WIFI := 1
+WIFI := 0
 
 # Maximum current your DPS model can provide. Eg 5000mA for the DPS5005
 # This is usually set by MODEL but you can override it here
@@ -29,9 +29,11 @@ DEBUG ?= 0
 
 # Font file
 METER_FONT_FILE ?= gfx/Ubuntu-C.ttf
-METER_FONT_SMALL_SIZE ?= 18
+#METER_FONT_FILE ?= gfx/MonospaceTypewriter.ttf
+#METER_FONT_FILE ?= gfx/OneSlot.ttf
+METER_FONT_SMALL_SIZE ?= 16
 METER_FONT_MEDIUM_SIZE ?= 24
-METER_FONT_LARGE_SIZE ?= 48
+METER_FONT_LARGE_SIZE ?= 32
 FULL_FONT_FILE ?= gfx/ProggyClean.ttf
 FULL_FONT_SMALL_SIZE ?= 16
 
@@ -41,10 +43,14 @@ COLORSPACE ?= 0
 # Colors for the main UI elements -- see ili9163c.h for list of colors
 COLOR_VOLTAGE ?= WHITE
 COLOR_AMPERAGE ?= WHITE
+COLOR_WATTAGE ?= WHITE
 COLOR_INPUT ?= WHITE
 
 # Optional tinting for UI elements
 TINT ?= ffffff
+
+# Enable DPS-look-alike mode
+DPSMODE_ENABLE ?= 1
 
 # Enable CC mode
 CC_ENABLE ?= 1
@@ -76,6 +82,7 @@ CFLAGS += \
           -DCOLORSPACE=$(COLORSPACE) \
           -DCOLOR_VOLTAGE=$(COLOR_VOLTAGE) \
           -DCOLOR_AMPERAGE=$(COLOR_AMPERAGE) \
+          -DCOLOR_WATTAGE=$(COLOR_WATTAGE) \
           -DCOLOR_INPUT=$(COLOR_INPUT) \
           -D$(MODEL)
 
@@ -88,6 +95,7 @@ OBJS = \
     crc16.o \
     uui.o \
     uui_number.o \
+    uui_time.o \
     func_cv.o \
     settings_calibration.o \
     hw.o \
@@ -146,6 +154,11 @@ endif
 ifeq ($(CL_ENABLE),1)
 	CFLAGS +=-DCONFIG_CL_ENABLE
 	OBJS += func_cl.o
+endif
+
+ifeq ($(DPSMODE_ENABLE),1)
+	CFLAGS +=-DCONFIG_DPSMODE_ENABLE
+	OBJS += func_dpsmode.o gfx-cvbar.o gfx-ccbar.o gfx-ppbar.o gfx-oppbar.o gfx-tmbar.o gfx-m1bar.o gfx-m2bar.o gfx-iconpower.o
 endif
 
 ifeq ($(FUNCGEN_ENABLE),1)

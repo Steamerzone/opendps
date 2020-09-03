@@ -1,18 +1,18 @@
-/* 
+/*
  * The MIT License (MIT)
- * 
- * Copyright (c) 2017 Johan Kanflo (github.com/kanflo)
- * 
+ *
+ * Copyright (c) 2019
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
  * in the Software without restriction, including without limitation the rights
  * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
  * copies of the Software, and to permit persons to whom the Software is
  * furnished to do so, subject to the following conditions:
- * 
+ *
  * The above copyright notice and this permission notice shall be included in
  * all copies or substantial portions of the Software.
- * 
+ *
  * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
  * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -22,57 +22,41 @@
  * THE SOFTWARE.
  */
 
+#ifndef __UUI_TIME_H__
+#define __UUI_TIME_H__
+
+#include <stdio.h>
 #include <stdint.h>
-#include <systick.h>
-#include <nvic.h>
-#include "tick.h"
+#include <stdbool.h>
+#include "tft.h"
+#include "uui.h"
 
-static volatile uint64_t tick_ms;
 
-/**
-  * @brief Initialize the systick module
-  * @retval none
-  */
-void systick_init(void)
-{
-    // 48MHz / 8 => 6000000 counts per second
-    systick_set_clocksource(STK_CSR_CLKSOURCE_AHB_DIV8);
+// HHH:MM:SS == 7
+#define DIGITS 7 
 
-    // 6000000/6000 = 1000 overflows per second - every 1ms one interrupt
-    // SysTick interrupt every N clock pulses: set reload to N-1
-    systick_set_reload(5999);
-
-    systick_interrupt_enable();
-    systick_counter_enable();
-}
+// 999:59:59 == 3600000-1 seconds
+#define MAX_TIME 3600000-1
 
 /**
-  * @brief Busy wait for a given time
-  * @param delay time in milliseconds
-  * @retval none
-  */
-
-void delay_ms(uint32_t delay)
-{
-    uint64_t start = tick_ms;
-    while (tick_ms < start + delay) ;    
-}
-
-/**
-  * @brief Get systick
-  * @retval number of milliseconcs since powerup
-  */
-uint64_t get_ticks(void)
-{
-    return tick_ms;
-}
+ * A UI item describing an editable time value formatted as HH:MM:SS
+ */
+typedef struct ui_time_t {
+    ui_item_t ui;
+    uint16_t color;
+    tft_font_size_t font_size;
+    ui_text_alignment_t alignment;
+    bool pad_dot; /** Make the '.' character the same width as the digits? */
+    uint8_t cur_digit;
+    int32_t value;
+    void (*changed)(struct ui_time_t *item);
+} ui_time_t;
 
 /**
-  * @brief STM32 systick handler
-  * @retval none
-  */
-void sys_tick_handler(void)
-{
-    tick_ms++;
-}
+ * @brief      Initialize number UI item
+ *
+ * @param      item  The item
+ */
+void time_init(ui_time_t *item);
 
+#endif // __UUI_NUMBER_H__

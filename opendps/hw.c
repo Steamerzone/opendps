@@ -88,10 +88,10 @@ static volatile uint64_t longpress_start;
 static volatile bool longpress_detected;
 /** Used to filter SET press from SET + ROT */
 static volatile bool set_pressed = false;
-static volatile bool set_skip = false;
 static volatile bool m1_pressed = false;
 static volatile bool m2_pressed = false;
-static volatile bool m1_and_m2_pressed = false;
+static volatile bool rot_pressed = false;
+static volatile bool key_combo = false;
 
 #define DEBOUNCE_TIME_MS    (30)
 
@@ -126,14 +126,14 @@ static uint32_t adc_counter;
   * at 0mA had an offset. For that reason, we calculate the individual offset
   * for the unit we're running on. Might work out... */
 #ifndef ADC_CHA_IOUT_GOLDEN_VALUE
- #define ADC_CHA_IOUT_GOLDEN_VALUE  (0x45)
+ #define ADC_CHA_IOUT_GOLDEN_VALUE  (0x00)  //EWK (org 0x45)
 #endif
 /** How many measurements do we take before calculating adc_i_offset */
 #define ADC_I_OFFSET_COUNT  (1000)
 /** Offset from golden value when measuring 0.00mA output current on this unit */
 static int32_t adc_i_offset;
 /** Are we measuring the offset or not? */
-static bool measure_i_out = true;
+static bool measure_i_out = false; //EWK (org true)
 /** Used to calculate mean value of ADC_CHA_IOUT when power out is disabled */
 static uint32_t i_offset_calc;
 
@@ -255,7 +255,8 @@ uint16_t hw_get_vtrig_mv(void)
   */
 void hw_longpress_check(void)
 {
-    if (longpress_event != event_none) {
+    // skip long presses that are part of a key combination
+    if ( ! key_combo && longpress_event != event_none) {
         if (get_ticks() - longpress_start > LONGPRESS_TIME_MS) {
             event_put(longpress_event, press_long);
             longpress_detected = true;
@@ -346,7 +347,7 @@ void adc1_2_isr(void)
     ADC_SR(ADC1) &= ~ADC_SR_JEOC;
     // If pwrctl_i_limit_raw == 0, the setting hasn't been read from past yet
     adc_counter++;
-    uint32_t i = adc_read_injected(ADC1, adc_cha_i_out + 1); // Yes, this is correct
+    uint32_t i =   adc_read_injected(ADC1, adc_cha_i_out + 1);  // Yes, this is correct
 
     /** @todo Make sure power out is not enabled during this measurement */
     if (measure_i_out) {
@@ -518,14 +519,8 @@ static void gpio_init(void)
     // PA7  I 0 An                    ADC1_IN7        R30-U2.7:V_OUT-B
 //tft    gpio_set_mode(GPIOA, GPIO_MODE_INPUT, GPIO_CNF_INPUT_ANALOG, GPIO7);
 
-// PA8  O 0 PP     (50 Mhz)       TFT.7           (not used by TFT)
-#ifdef TFT_CSN_PORT
-    gpio_set_mode(TFT_CSN_PORT, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL, TFT_CSN_PIN);
-    gpio_set(TFT_CSN_PORT, TFT_CSN_PIN);
-#else
-    
+    // PA8  O 0 PP     (50 Mhz)       TFT.7           (not used by TFT)
     gpio_set_mode(GPIOA, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL, GPIO8);
-#endif
 //    gpio_clear(GPIOA, GPIO8); /** @todo DPS5005 comms version with fw 1.3 does this, check functions */
 
     // PA9  I 1 Flt
@@ -645,7 +640,7 @@ static void gpio_init(void)
 
     // PC13 I 0 Flt
 //    gpio_set_mode(GPIOC, GPIO_MODE_INPUT, GPIO_CNF_INPUT_FLOAT, GPIO13);
-#if defined(DPS5015) || defined(DPS5020)
+#ifdef DPS5015
 	gpio_set_mode(GPIOC, GPIO_MODE_OUTPUT_50_MHZ, GPIO_CNF_OUTPUT_PUSHPULL, GPIO13);
 #endif
 
@@ -842,20 +837,30 @@ void BUTTON_SEL_isr(void)
 {
     static bool falling = true;
     exti_reset_request(BUTTON_SEL_EXTI);
+
     if (falling) {
         if (is_bouncing()) return;
         set_pressed = true;
-        set_skip = false;
+        key_combo = false;
+
         longpress_begin(event_button_sel);
         exti_set_trigger(BUTTON_SEL_EXTI, EXTI_TRIGGER_RISING);
     } else {
         set_pressed = false;
-        if (!set_skip) {
-            if (!longpress_end()) {
-                // Not a long press, send short press
-                event_put(event_button_sel, press_short);
-            }
+
+        if ( ! key_combo && m1_pressed ) {
+            key_combo = true;
+            event_put(event_button_sel_m1, press_short);
+            return;
         }
+
+        if ( ! key_combo && m2_pressed ) {
+            key_combo = true;
+            event_put(event_button_sel_m1, press_short);
+        }
+
+        if ( ! longpress_end() && ! key_combo) event_put(event_button_sel, press_short);
+
         exti_set_trigger(BUTTON_SEL_EXTI, EXTI_TRIGGER_FALLING);
     }
     falling = !falling;
@@ -871,21 +876,27 @@ void BUTTON_M1_isr(void)
     exti_reset_request(BUTTON_M1_EXTI);
     if (falling) {
         if (is_bouncing()) return;
+
         m1_pressed = true;
-        if (m2_pressed)
-            m1_and_m2_pressed = true;
+        key_combo = false;
+
+        longpress_begin(event_button_m1);
         exti_set_trigger(BUTTON_M1_EXTI, EXTI_TRIGGER_RISING);
     } else {
         m1_pressed = false;
 
-        if (!m2_pressed) {
-            if (m1_and_m2_pressed) {
-                m1_and_m2_pressed = false;
-                event_put(event_buttom_m1_and_m2, press_short);
-            } else {
-                event_put(event_button_m1, press_short);
-            }
+        if ( ! key_combo && set_pressed ) {
+            key_combo = true;
+            event_put(event_button_sel_m1, press_short);
+            return;
         }
+
+        if ( ! key_combo && m2_pressed ) {
+            key_combo = true;
+            event_put(event_button_m1_and_m2, press_short);
+        }
+
+        if ( ! longpress_end() && ! key_combo) event_put(event_button_m1, press_short);
 
         exti_set_trigger(BUTTON_M1_EXTI, EXTI_TRIGGER_FALLING);
     }
@@ -903,20 +914,27 @@ void BUTTON_M2_isr(void)
     if (falling) {
         if (is_bouncing()) return;
         m2_pressed = true;
-        if (m1_pressed)
-            m1_and_m2_pressed = true;
+
+        // do not fire button if rot rotated while down
+        key_combo = false;
+
+        longpress_begin(event_button_m2);
         exti_set_trigger(BUTTON_M2_EXTI, EXTI_TRIGGER_RISING);
     } else {
         m2_pressed = false;
 
-        if (!m1_pressed) {
-            if (m1_and_m2_pressed) {
-                m1_and_m2_pressed = false;
-                event_put(event_buttom_m1_and_m2, press_short);
-            } else {
-                event_put(event_button_m2, press_short);
-            }
+        if ( ! key_combo && set_pressed ) {
+            key_combo = true;
+            event_put(event_button_sel_m2, press_short);
+            return;
         }
+
+        if ( ! key_combo && m1_pressed ) {
+            key_combo = true;
+            event_put(event_button_m1_and_m2, press_short);
+        }
+
+        if ( ! longpress_end() && ! key_combo) event_put(event_button_m2, press_short);
 
         exti_set_trigger(BUTTON_M2_EXTI, EXTI_TRIGGER_FALLING);
     }
@@ -952,13 +970,13 @@ void BUTTON_ROTARY_isr(void)
         static bool falling = true;
         if (falling) {
             if (is_bouncing()) return;
+            rot_pressed = true;
+            key_combo = false;
             longpress_begin(event_rot_press);
             exti_set_trigger(BUTTON_ROT_PRESS_EXTI, EXTI_TRIGGER_RISING);
         } else {
-            if (!longpress_end()) {
-                // Not a long press, send short press
-                event_put(event_rot_press, press_short);
-            }
+            rot_pressed = false;
+            if ( ! longpress_end() && ! key_combo) event_put(event_rot_press, press_short);
             exti_set_trigger(BUTTON_ROT_PRESS_EXTI, EXTI_TRIGGER_FALLING);
         }
         falling = !falling;
@@ -968,19 +986,36 @@ void BUTTON_ROTARY_isr(void)
         exti_reset_request(BUTTON_ROT_A_EXTI);
         bool a = (((uint16_t) GPIO_IDR(BUTTON_ROT_A_PORT)) & BUTTON_ROT_A_PIN) ? 1 : 0; // Slightly faster than gpio_get(...)
         bool b = (((uint16_t) GPIO_IDR(BUTTON_ROT_B_PORT)) & BUTTON_ROT_B_PIN) ? 1 : 0;
+
         if (a == b) {
             if (set_pressed) {
-                set_skip = true;
-                (void) longpress_end();
+                key_combo = true;
                 event_put(event_rot_left_set, press_short);
+            } else if (m1_pressed) {
+                key_combo = true;
+                event_put(event_rot_left_m1, press_short);
+            } else if (m2_pressed) {
+                key_combo = true;
+                event_put(event_rot_left_m2, press_short);
+            } else if (rot_pressed) {
+                key_combo = true;
+                event_put(event_rot_left_down, press_short);
             } else {
                 event_put(event_rot_left, press_short);
             }
         } else {
             if (set_pressed) {
-                set_skip = true;
-                (void) longpress_end();
+                key_combo = true;
                 event_put(event_rot_right_set, press_short);
+            } else if (m1_pressed) {
+                key_combo = true;
+                event_put(event_rot_right_m1, press_short);
+            } else if (m2_pressed) {
+                key_combo = true;
+                event_put(event_rot_right_m2, press_short);
+            } else if (rot_pressed) {
+                key_combo = true;
+                event_put(event_rot_right_down, press_short);
             } else {
                 event_put(event_rot_right, press_short);
             }
