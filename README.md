@@ -1,6 +1,6 @@
 # OpenDPS
 
-MessyCoding 
+MessyCoding,
 Steamerzone:
  - made dpsmode the default screen (color)
  - added tft_clear() to dpsmode mode screen
