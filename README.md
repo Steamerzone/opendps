@@ -4,6 +4,8 @@ Steamerzone:
  - made dpsmode the default screen (color)
  - added tft_clear() to dpsmode mode screen
  - some fixes for saving settings in dpsmode, still some bugs left
+ - changed font sizes
+ - changed watt display to 3 digits
 
 #### Give your DPS5005 the upgrade it deserves
 
